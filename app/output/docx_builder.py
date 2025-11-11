@@ -32,34 +32,59 @@ class DocxBuilder:
         font.name = "Calibri"
         font.size = Pt(11)
 
+        # Determine language for headers
+        language = resume.language or "en"
+        headers = self._get_section_headers(language)
+
         # Add contact information
         self._add_contact(doc, resume.contact)
 
         # Add summary
         if resume.summary:
-            self._add_section_header(doc, "Professional Summary")
+            self._add_section_header(doc, headers["summary"])
             self._add_paragraph(doc, resume.summary)
 
         # Add experience
         if resume.experience:
-            self._add_section_header(doc, "Experience")
+            self._add_section_header(doc, headers["experience"])
             for exp in resume.experience:
-                self._add_experience_entry(doc, exp)
+                # Only add valid experience entries (skip malformed ones)
+                if exp.title and exp.title != "Unknown" and exp.title.strip():
+                    # Skip if title looks like a section header or summary text
+                    if not any(keyword in exp.title.lower() for keyword in ["experience", "summary", "skills", "education", "опыт", "резюме", "навыки", "образование"]):
+                        self._add_experience_entry(doc, exp, language)
 
         # Add skills
         if resume.skills:
-            self._add_section_header(doc, "Skills")
+            self._add_section_header(doc, headers["skills"])
             skills_text = ", ".join(resume.skills)
             self._add_paragraph(doc, skills_text)
 
         # Add education
         if resume.education:
-            self._add_section_header(doc, "Education")
+            self._add_section_header(doc, headers["education"])
             for edu in resume.education:
                 self._add_education_entry(doc, edu)
 
         # Save document
         doc.save(str(output_path))
+    
+    def _get_section_headers(self, language: str) -> dict:
+        """Get section headers based on language."""
+        if language == "ru":
+            return {
+                "summary": "Профессиональное резюме",
+                "experience": "Опыт работы",
+                "skills": "Навыки",
+                "education": "Образование",
+            }
+        else:
+            return {
+                "summary": "Professional Summary",
+                "experience": "Experience",
+                "skills": "Skills",
+                "education": "Education",
+            }
 
     def build_cover_letter(
         self, cover_letter_text: str, contact_info, output_path: Path
@@ -146,14 +171,15 @@ class DocxBuilder:
         """Add paragraph."""
         doc.add_paragraph(text)
 
-    def _add_experience_entry(self, doc: Document, exp) -> None:
+    def _add_experience_entry(self, doc: Document, exp, language: str = "en") -> None:
         """Add experience entry."""
         # Title and company
         para = doc.add_paragraph()
         run = para.add_run(exp.title)
         run.bold = True
-        if exp.company:
-            para.add_run(f" at {exp.company}")
+        if exp.company and exp.company != "Unknown":
+            separator = " в " if language == "ru" else " at "
+            para.add_run(f"{separator}{exp.company}")
 
         # Dates
         if exp.dates:
@@ -162,7 +188,8 @@ class DocxBuilder:
 
         # Bullets
         for bullet in exp.bullets:
-            para = doc.add_paragraph(bullet, style="List Bullet")
+            if bullet and bullet.strip():
+                para = doc.add_paragraph(bullet, style="List Bullet")
 
         doc.add_paragraph()  # Spacing
 

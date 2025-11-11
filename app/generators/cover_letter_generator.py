@@ -3,6 +3,9 @@
 from app.generators.llm_client import LLMClient
 from app.generators.prompt_builder import PromptBuilder
 from app.models import JobPosting, ParsedResume
+from app.utils.experience_calculator import get_experience_years_for_cover_letter
+from app.utils.llm_cache import llm_cache
+from app.utils.russian_grammar import format_years_russian, format_years_english
 
 
 class CoverLetterGenerator:
@@ -52,9 +55,22 @@ class CoverLetterGenerator:
             )
 
         try:
-            cover_letter = self.llm.generate(
-                prompt, system_prompt=system_prompt, temperature=0.8
-            )
+            # Check cache first
+            cached_response = llm_cache.get(prompt, system_prompt)
+            if cached_response:
+                cover_letter = cached_response
+                from app.utils.token_tracker import token_tracker
+                token_tracker.add_usage(cached=True)
+            else:
+                cover_letter = self.llm.generate(
+                    prompt, 
+                    system_prompt=system_prompt, 
+                    temperature=0.8,
+                    max_tokens=2000  # Allow enough tokens for full cover letter
+                )
+                # Cache the response
+                if cover_letter:
+                    llm_cache.set(prompt, cover_letter, system_prompt)
 
             # Clean up response
             cover_letter = cover_letter.strip()
@@ -108,13 +124,14 @@ class CoverLetterGenerator:
                 greeting = "Уважаемые коллеги,"
             
             skills_text = ", ".join(resume.skills[:5]) if resume.skills else "соответствующие навыки"
-            experience_years = len(resume.experience)
+            experience_years = get_experience_years_for_cover_letter(resume, job)
+            experience_years_text = format_years_russian(experience_years)
             
             cover_letter = f"""{greeting}
 
 Я пишу, чтобы выразить свой интерес к вакансии {job.title} в компании {company_name}.
 
-Благодаря моему опыту работы с {skills_text}, я считаю, что хорошо подхожу для этой роли. Мой опыт включает {experience_years} лет соответствующей работы.
+Благодаря моему опыту работы с {skills_text}, я считаю, что хорошо подхожу для этой роли. Мой опыт включает {experience_years_text} соответствующей работы.
 
 Я заинтересован в возможности внести вклад в вашу команду и был бы рад обсудить, как мои навыки и опыт соответствуют вашим потребностям.
 
@@ -133,13 +150,14 @@ class CoverLetterGenerator:
 
             # Get skills for the letter
             skills_text = ", ".join(resume.skills[:5]) if resume.skills else "relevant skills"
-            experience_years = len(resume.experience)
+            experience_years = get_experience_years_for_cover_letter(resume, job)
+            experience_years_text = format_years_english(experience_years)
 
             cover_letter = f"""{greeting}
 
 I am writing to express my interest in the {job.title} position at {company_name}.
 
-With my background in {skills_text}, I believe I am well-suited for this role. My experience includes {experience_years} years of relevant work experience.
+With my background in {skills_text}, I believe I am well-suited for this role. My experience includes {experience_years_text} of relevant work experience.
 
 I am excited about the opportunity to contribute to your team and would welcome the chance to discuss how my skills and experience align with your needs.
 

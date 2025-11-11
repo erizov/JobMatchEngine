@@ -183,8 +183,17 @@ async def process_resume_file(
         print(f"  [6/6] Generating output files in 2 languages...")
         base_name = resume_file.stem
 
-        # Generate outputs for both languages
-        for lang_code in ["en", "ru"]:
+        # Determine which languages to generate based on settings
+        output_langs_setting = settings.output_languages or "ru"
+        if output_langs_setting.lower() == "both":
+            languages_to_generate = ["ru", "en"]
+        elif output_langs_setting.lower() == "en":
+            languages_to_generate = ["en"]
+        else:  # Default to Russian only
+            languages_to_generate = ["ru"]
+        
+        # Generate outputs for selected languages
+        for lang_code in languages_to_generate:
             lang_suffix = f"_{lang_code}"
             print(f"       Generating {lang_code.upper()} versions...")
 
@@ -282,7 +291,26 @@ async def test_full_pipeline():
     print("JobMatchEngine Integration Test")
     print("=" * 60)
 
-    # Cleanup old files
+    # Cleanup ALL output files before running tests
+    print("\n[INFO] Cleaning up output directory...")
+    import shutil
+    output_dir = settings.output_dir
+    if output_dir.exists():
+        try:
+            # Remove all files in output directory
+            for file_path in output_dir.iterdir():
+                if file_path.is_file():
+                    file_path.unlink()
+                elif file_path.is_dir():
+                    shutil.rmtree(file_path)
+            print(f"  [OK] Cleaned output directory: {output_dir}")
+        except Exception as e:
+            print(f"  [WARN] Could not clean output directory: {e}")
+    else:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"  [OK] Created output directory: {output_dir}")
+    
+    # Also cleanup old files (for files older than threshold)
     print("\n[INFO] Cleaning up old output files...")
     cleanup_result = cleanup_old_files()
     if cleanup_result["files_deleted"] > 0:
@@ -306,17 +334,104 @@ async def test_full_pipeline():
     md_builder = MarkdownBuilder()
     txt_builder = TextBuilder()
 
-    # Check LLM availability
+    # Check LLM availability and connectivity - REQUIRED for tests
+    # If LLM connectivity fails, stop immediately without continuing
+    print("\n[INFO] Checking LLM connectivity...")
     use_llm = False
+    llm_connection_error = None
+    
     try:
         from app.generators.llm_client import LLMClient
 
         llm = LLMClient()
-        use_llm = True
-        print("\n[INFO] LLM client available - enhancement enabled")
+        
+        # Test actual connection with a simple request
+        test_prompt = "Say 'OK' if you can read this."
+        try:
+            response = llm.generate(
+                prompt=test_prompt,
+                system_prompt="You are a helpful assistant.",
+                temperature=0.1,
+                max_tokens=10,
+            )
+            if response and len(response.strip()) > 0:
+                use_llm = True
+                print("  [OK] LLM connection successful - enhancement enabled")
+            else:
+                llm_connection_error = "LLM returned empty response"
+                print(f"  [ERROR] {llm_connection_error}")
+                print("\n" + "=" * 60)
+                print("TEST FAILURE: Cannot connect to LLM")
+                print("=" * 60)
+                print(f"Error: {llm_connection_error}")
+                print("\nPlease check:")
+                print("  1. Your API key in .env file")
+                print("  2. Your network connection")
+                print("  3. API endpoint accessibility")
+                print("=" * 60)
+                sys.exit(1)
+        except Exception as conn_error:
+            llm_connection_error = f"LLM connection failed: {str(conn_error)}"
+            print(f"  [ERROR] {llm_connection_error}")
+            print("\n" + "=" * 60)
+            print("TEST FAILURE: Cannot connect to LLM")
+            print("=" * 60)
+            print(f"Error: {llm_connection_error}")
+            print("\nPlease check:")
+            print("  1. Your API key in .env file")
+            print("  2. Your network connection")
+            print("  3. API endpoint accessibility")
+            print("=" * 60)
+            sys.exit(1)
+    except ValueError as e:
+        # Configuration error (missing API key, etc.)
+        llm_connection_error = f"LLM configuration error: {str(e)}"
+        print(f"  [ERROR] {llm_connection_error}")
+        print("\n" + "=" * 60)
+        print("TEST FAILURE: LLM not properly configured")
+        print("=" * 60)
+        print(f"Error: {llm_connection_error}")
+        print("\nPlease check:")
+        print("  1. OPENAI_API_KEY is set in .env file")
+        print("  2. OPENAI_API_BASE is set correctly (if using proxy)")
+        print("  3. All required environment variables are present")
+        print("=" * 60)
+        sys.exit(1)
+    except ImportError as e:
+        # Package not installed
+        llm_connection_error = f"LLM package not installed: {str(e)}"
+        print(f"  [ERROR] {llm_connection_error}")
+        print("\n" + "=" * 60)
+        print("TEST FAILURE: Required LLM package not installed")
+        print("=" * 60)
+        print(f"Error: {llm_connection_error}")
+        print("\nPlease install required dependencies:")
+        print("  pip install openai")
+        print("=" * 60)
+        sys.exit(1)
     except Exception as e:
-        print(f"\n[INFO] LLM not configured: {e}")
-        print("[INFO] Will process files without LLM enhancement")
+        # Other unexpected errors
+        llm_connection_error = f"Unexpected LLM error: {str(e)}"
+        print(f"  [ERROR] {llm_connection_error}")
+        print("\n" + "=" * 60)
+        print("TEST FAILURE: Unexpected error while checking LLM connectivity")
+        print("=" * 60)
+        print(f"Error: {llm_connection_error}")
+        print("=" * 60)
+        sys.exit(1)
+    
+    # If we reach here, LLM connectivity is confirmed
+    if not use_llm:
+        print("\n" + "=" * 60)
+        print("TEST FAILURE: LLM connectivity check failed")
+        print("=" * 60)
+        print("LLM connection test did not complete successfully.")
+        print("=" * 60)
+        sys.exit(1)
+    
+    # Reset token tracker at start of tests
+    from app.utils.token_tracker import token_tracker
+    token_tracker.reset()
 
     # Find input files
     input_dir = settings.input_dir
@@ -444,6 +559,16 @@ async def test_full_pipeline():
 
     completed = sum(1 for r in all_results if r["status"] == "completed")
     failed = sum(1 for r in all_results if r["status"] == "failed")
+    
+    # Display token usage
+    from app.utils.token_tracker import token_tracker
+    usage = token_tracker.get_summary()
+    print(f"\nToken Usage:")
+    print(f"  Total tokens: {usage['total_tokens']}")
+    print(f"  Prompt tokens: {usage['prompt_tokens']}")
+    print(f"  Completion tokens: {usage['completion_tokens']}")
+    if usage['cached_responses'] > 0:
+        print(f"  Cached responses used: {usage['cached_responses']} (saved tokens)")
 
     print(f"\nTotal files processed: {len(all_results)}")
     print(f"  [OK] Completed: {completed}")

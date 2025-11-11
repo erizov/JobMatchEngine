@@ -6,6 +6,7 @@ from typing import List, Optional
 from app.generators.llm_client import LLMClient
 from app.generators.prompt_builder import PromptBuilder
 from app.models import Experience, JobPosting, ParsedResume
+from app.utils.llm_cache import llm_cache
 
 
 class ResumeGenerator:
@@ -22,6 +23,7 @@ class ResumeGenerator:
         job: JobPosting,
         tone: str = "balanced",
         max_keywords: int = 3,
+        rag_context: Optional[str] = None,
     ) -> ParsedResume:
         """
         Generate enhanced resume optimized for job posting.
@@ -35,21 +37,27 @@ class ResumeGenerator:
         Returns:
             Enhanced ParsedResume
         """
-        # Generate enhanced summary
-        enhanced_summary = self.generate_summary(resume, job, tone)
+        # Generate enhanced summary (fallback to original if fails)
+        enhanced_summary = self.generate_summary(resume, job, tone, rag_context)
+        if not enhanced_summary:
+            enhanced_summary = resume.summary
 
-        # Generate enhanced experience
-        enhanced_experience = self.generate_experience(resume, job, tone)
+        # Generate enhanced experience (fallback to original if fails or empty)
+        enhanced_experience = self.generate_experience(resume, job, tone, rag_context)
+        if not enhanced_experience:
+            enhanced_experience = resume.experience
 
-        # Generate enhanced skills
-        enhanced_skills = self.generate_skills(resume, job, max_keywords)
+        # Generate enhanced skills (fallback to original if fails or empty)
+        enhanced_skills = self.generate_skills(resume, job, max_keywords, rag_context)
+        if not enhanced_skills:
+            enhanced_skills = resume.skills
 
-        # Create enhanced resume
+        # Create enhanced resume - always preserve original data
         enhanced_resume = ParsedResume(
             contact=resume.contact,
-            summary=enhanced_summary,
-            experience=enhanced_experience,
-            skills=enhanced_skills,
+            summary=enhanced_summary or resume.summary,
+            experience=enhanced_experience or resume.experience,
+            skills=enhanced_skills or resume.skills,
             education=resume.education,
             certifications=resume.certifications,
             languages=resume.languages,
@@ -64,10 +72,11 @@ class ResumeGenerator:
         resume: ParsedResume,
         job: JobPosting,
         tone: str = "balanced",
+        rag_context: Optional[str] = None,
     ) -> Optional[str]:
         """Generate enhanced summary."""
         prompt = self.prompt_builder.build_resume_summary_prompt(
-            resume.summary, resume, job, tone
+            resume.summary, resume, job, tone, rag_context
         )
 
         system_prompt = (
@@ -77,9 +86,22 @@ class ResumeGenerator:
         )
 
         try:
-            summary = self.llm.generate(
-                prompt, system_prompt=system_prompt, temperature=0.7
-            )
+            # Check cache first
+            cached_response = llm_cache.get(prompt, system_prompt)
+            if cached_response:
+                summary = cached_response
+                from app.utils.token_tracker import token_tracker
+                token_tracker.add_usage(cached=True)
+            else:
+                summary = self.llm.generate(
+                    prompt, 
+                    system_prompt=system_prompt, 
+                    temperature=0.7,
+                    max_tokens=500  # Allow enough tokens for full summary
+                )
+                # Cache the response
+                if summary:
+                    llm_cache.set(prompt, summary, system_prompt)
             # Clean up response
             if summary:
                 summary = summary.strip()
@@ -102,13 +124,14 @@ class ResumeGenerator:
         resume: ParsedResume,
         job: JobPosting,
         tone: str = "balanced",
+        rag_context: Optional[str] = None,
     ) -> List[Experience]:
         """Generate enhanced experience entries."""
         enhanced_experience = []
 
         for exp in resume.experience:
-            prompt = self.prompt_builder.build_experience_bullet_prompt(
-                exp, job, tone
+            prompt = self.prompt_builder.generate_experience_bullet_prompt(
+                exp, job, tone, rag_context
             )
 
             system_prompt = (
@@ -117,9 +140,22 @@ class ResumeGenerator:
             )
 
             try:
-                response = self.llm.generate(
-                    prompt, system_prompt=system_prompt, temperature=0.7
-                )
+                # Check cache first
+                cached_response = llm_cache.get(prompt, system_prompt)
+                if cached_response:
+                    response = cached_response
+                    from app.utils.token_tracker import token_tracker
+                    token_tracker.add_usage(cached=True)
+                else:
+                    response = self.llm.generate(
+                        prompt, 
+                        system_prompt=system_prompt, 
+                        temperature=0.7,
+                        max_tokens=800  # Allow enough tokens for full experience bullets
+                    )
+                    # Cache the response
+                    if response:
+                        llm_cache.set(prompt, response, system_prompt)
 
                 # Parse bullets from response
                 bullets = self._parse_bullets(response)
@@ -145,10 +181,11 @@ class ResumeGenerator:
         resume: ParsedResume,
         job: JobPosting,
         max_keywords: int = 3,
+        rag_context: Optional[str] = None,
     ) -> List[str]:
         """Generate enhanced skills list."""
         prompt = self.prompt_builder.build_skills_prompt(
-            resume.skills, job, max_keywords
+            resume.skills, job, max_keywords, rag_context
         )
 
         system_prompt = (
@@ -157,9 +194,22 @@ class ResumeGenerator:
         )
 
         try:
-            response = self.llm.generate(
-                prompt, system_prompt=system_prompt, temperature=0.5
-            )
+            # Check cache first
+            cached_response = llm_cache.get(prompt, system_prompt)
+            if cached_response:
+                response = cached_response
+                from app.utils.token_tracker import token_tracker
+                token_tracker.add_usage(cached=True)
+            else:
+                response = self.llm.generate(
+                    prompt, 
+                    system_prompt=system_prompt, 
+                    temperature=0.5,
+                    max_tokens=400  # Allow enough tokens for skills list
+                )
+                # Cache the response
+                if response:
+                    llm_cache.set(prompt, response, system_prompt)
 
             # Parse skills from response
             skills = self._parse_skills(response)

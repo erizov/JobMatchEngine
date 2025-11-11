@@ -1,8 +1,9 @@
 """Unified LLM client interface for OpenAI, Anthropic, and Ollama."""
 
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
-from app.config import settings
+from app.config import OPENAI_API_BASE, OPENAI_API_KEY, settings
+from app.utils.token_tracker import token_tracker
 
 
 class LLMClient:
@@ -27,9 +28,18 @@ class LLMClient:
         try:
             from openai import OpenAI
 
-            if not settings.openai_api_key:
+            if not OPENAI_API_KEY:
                 raise ValueError("OpenAI API key not configured")
-            self.client = OpenAI(api_key=settings.openai_api_key)
+            
+            # Use custom base URL if provided (for proxy endpoints)
+            client_kwargs = {
+                "api_key": OPENAI_API_KEY,
+                "timeout": 120.0,  # 2 minute timeout for long responses
+            }
+            if OPENAI_API_BASE:
+                client_kwargs["base_url"] = OPENAI_API_BASE
+            
+            self.client = OpenAI(**client_kwargs)
             self._generate = self._generate_openai
         except ImportError:
             raise ImportError("openai package not installed")
@@ -75,7 +85,15 @@ class LLMClient:
         Returns:
             Generated text
         """
-        return self._generate(prompt, system_prompt, temperature, max_tokens)
+        content, usage = self._generate(prompt, system_prompt, temperature, max_tokens)
+        # Track token usage
+        if usage:
+            token_tracker.add_usage(
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                total_tokens=usage.get("total_tokens", 0),
+            )
+        return content
 
     def _generate_openai(
         self,
@@ -83,7 +101,7 @@ class LLMClient:
         system_prompt: Optional[str],
         temperature: float,
         max_tokens: Optional[int],
-    ) -> str:
+    ) -> Tuple[str, Optional[Dict]]:
         """Generate using OpenAI."""
         messages = []
         if system_prompt:
@@ -97,7 +115,30 @@ class LLMClient:
             max_tokens=max_tokens,
         )
 
-        return response.choices[0].message.content
+        # Ensure we get the full response content
+        content = response.choices[0].message.content
+        if not content:
+            raise ValueError("Empty response from LLM")
+        
+        # Check if response was truncated (finish_reason should be 'stop' for complete)
+        finish_reason = response.choices[0].finish_reason
+        if finish_reason == "length":
+            # Response was truncated due to max_tokens limit
+            raise ValueError(
+                f"Response truncated (finish_reason: {finish_reason}). "
+                f"Consider increasing max_tokens. Current content length: {len(content)}"
+            )
+        
+        # Extract token usage
+        usage = None
+        if hasattr(response, "usage") and response.usage:
+            usage = {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens,
+            }
+        
+        return content, usage
 
     def _generate_anthropic(
         self,
@@ -105,7 +146,7 @@ class LLMClient:
         system_prompt: Optional[str],
         temperature: float,
         max_tokens: Optional[int],
-    ) -> str:
+    ) -> Tuple[str, Optional[Dict]]:
         """Generate using Anthropic."""
         response = self.client.messages.create(
             model=self.model,
@@ -115,7 +156,19 @@ class LLMClient:
             messages=[{"role": "user", "content": prompt}],
         )
 
-        return response.content[0].text
+        # Extract token usage if available
+        usage = None
+        if hasattr(response, "usage"):
+            usage = {
+                "prompt_tokens": getattr(response.usage, "input_tokens", 0),
+                "completion_tokens": getattr(response.usage, "output_tokens", 0),
+                "total_tokens": (
+                    getattr(response.usage, "input_tokens", 0) +
+                    getattr(response.usage, "output_tokens", 0)
+                ),
+            }
+
+        return response.content[0].text, usage
 
     def _generate_ollama(
         self,
@@ -123,7 +176,7 @@ class LLMClient:
         system_prompt: Optional[str],
         temperature: float,
         max_tokens: Optional[int],
-    ) -> str:
+    ) -> Tuple[str, Optional[Dict]]:
         """Generate using Ollama."""
         full_prompt = prompt
         if system_prompt:
@@ -138,5 +191,17 @@ class LLMClient:
             },
         )
 
-        return response["response"]
+        # Extract token usage if available
+        usage = None
+        if "prompt_eval_count" in response and "eval_count" in response:
+            usage = {
+                "prompt_tokens": response.get("prompt_eval_count", 0),
+                "completion_tokens": response.get("eval_count", 0),
+                "total_tokens": (
+                    response.get("prompt_eval_count", 0) +
+                    response.get("eval_count", 0)
+                ),
+            }
+
+        return response["response"], usage
 

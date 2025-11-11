@@ -25,6 +25,10 @@ class Settings(BaseSettings):
         default=None,
         description="OpenAI API key",
     )
+    openai_api_base: Optional[str] = Field(
+        default=None,
+        description="OpenAI API base URL (for proxy endpoints)",
+    )
     anthropic_api_key: Optional[str] = Field(
         default=None,
         description="Anthropic API key",
@@ -68,8 +72,12 @@ class Settings(BaseSettings):
 
     # Language Settings
     default_language: Optional[str] = Field(
-        default=None,
-        description="Default language (None = auto-detect)",
+        default="ru",
+        description="Default language (ru, en, or None for auto-detect)",
+    )
+    output_languages: str = Field(
+        default="ru",
+        description="Output languages: 'ru' (Russian only), 'en' (English only), or 'both'",
     )
 
     # Cleanup Settings
@@ -95,4 +103,8 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+# Convenience exports for direct imports
+OPENAI_API_KEY = settings.openai_api_key
+OPENAI_API_BASE = settings.openai_api_base
 

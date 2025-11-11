@@ -13,6 +13,9 @@ AI-powered system to enhance resumes and generate tailored cover letters optimiz
 - 📝 **Multiple Outputs**: DOCX, MD, TXT formats in both languages
 - 🔄 **Dynamic Job Fetching**: Automatically fetches latest job postings from hh.ru
 - 🧹 **Auto Cleanup**: Automatically removes old output files
+- 💾 **LLM Response Caching**: Saves tokens by caching responses across formats
+- 📈 **Token Usage Tracking**: Monitor API usage with detailed token statistics
+- 🧠 **RAG Support**: Optional knowledge base file for enhanced context
 
 ## 🛠️ Technologies Used
 
