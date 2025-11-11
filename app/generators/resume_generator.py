@@ -143,10 +143,19 @@ class ResumeGenerator:
             else:
                 prompt += "\n\nCRITICAL: Write ALL bullets COMPLETELY in English language. Use English grammar and vocabulary."
 
-            system_prompt = (
-                "You are a professional resume writer. Optimize experience "
-                "bullets for ATS compatibility while preserving all facts."
-            )
+            # Language-specific system prompt
+            if target_language == "ru":
+                system_prompt = (
+                    "Вы профессиональный писатель резюме. Оптимизируйте пункты опыта работы "
+                    "для систем ATS, сохраняя все факты. ВАЖНО: Пишите ПОЛНОСТЬЮ на русском языке, "
+                    "не смешивайте языки. Используйте русскую грамматику и технические термины на русском."
+                )
+            else:
+                system_prompt = (
+                    "You are a professional resume writer. Optimize experience "
+                    "bullets for ATS compatibility while preserving all facts. "
+                    "Write COMPLETELY in English language."
+                )
 
             try:
                 # Check cache first
