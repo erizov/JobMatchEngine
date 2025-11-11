@@ -145,7 +145,7 @@ Instructions:
 3. Add quantifiable metrics if mentioned in original (DO NOT invent numbers)
 4. Keep each bullet to 15-25 words (can be longer if needed for clarity and detail)
 5. Maintain all factual information (company, dates, role)
-6. Use strong action verbs (developed, implemented, led, etc.)
+6. Use strong action verbs (developed, implemented, led, etc.) - TRANSLATE to target language
 7. Use REAL company names and actual experience from resume
 8. Generate ALL bullets from the original - do not skip any
 9. If original has no bullets, create 4-6 detailed relevant bullets based on the job title and company
@@ -153,6 +153,7 @@ Instructions:
 11. Be detailed and comprehensive - expand on achievements and responsibilities
 12. Include specific technologies, methodologies, and results where applicable
 13. DO NOT mix English and Russian in the same bullet - use ONE language consistently
+14. TRANSLATE the job title if it's in a different language - if target is Russian, translate "Software Engineer" to "Инженер-программист" or similar
 
 Generate optimized bullets (one per line, with - prefix). Include ALL bullets:"""
 

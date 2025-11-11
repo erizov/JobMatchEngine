@@ -160,6 +160,9 @@ class ResumeGenerator:
             # Add language-specific instruction to prompt
             if target_language == "ru":
                 prompt += "\n\nCRITICAL: Write ALL bullets COMPLETELY in Russian language. Use Russian grammar, vocabulary, and technical terms. DO NOT use English words or phrases."
+                # Also translate the job title if it's in English
+                if exp.title and not any('\u0400' <= c <= '\u04FF' for c in exp.title):
+                    prompt += f"\n\nIMPORTANT: The job title '{exp.title}' is in English. When writing bullets, refer to it in Russian (e.g., 'Инженер-программист', 'Разработчик', etc.)"
             else:
                 prompt += "\n\nCRITICAL: Write ALL bullets COMPLETELY in English language. Use English grammar and vocabulary."
 
@@ -232,9 +235,20 @@ class ResumeGenerator:
                     if potential_bullets:
                         final_bullets = potential_bullets[:5]  # Limit to 5
 
+                # Translate title if needed for Russian
+                title_text = exp.title
+                if target_language == "ru" and exp.title:
+                    # Check if title is in English (has English words but no Russian chars)
+                    russian_chars_in_title = sum(1 for c in exp.title if '\u0400' <= c <= '\u04FF')
+                    if russian_chars_in_title == 0 and len(exp.title) > 5:
+                        # Title is in English, add instruction to translate it
+                        # The LLM should have translated it, but if not, we'll use as-is
+                        # (In a future enhancement, we could add explicit title translation)
+                        pass  # For now, use title as-is - bullets should be in Russian
+                
                 # Create enhanced experience entry - always include even if bullets are empty
                 enhanced_exp = Experience(
-                    title=exp.title,
+                    title=title_text,
                     company=exp.company,
                     dates=exp.dates,
                     location=exp.location,
