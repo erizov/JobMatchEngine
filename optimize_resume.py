@@ -151,6 +151,17 @@ async def optimize_resume_cli(
         print(f"       [WARN] Cover letter generation failed: {e}")
         cover_letter = f"Cover letter generation failed: {str(e)}"
     
+    # Determine which formats to generate (set before loop)
+    formats_to_generate = []
+    if output_formats.lower() == "all":
+        formats_to_generate = ["docx", "md", "txt"]
+    elif output_formats.lower() == "md":
+        formats_to_generate = ["md"]
+    elif output_formats.lower() == "txt":
+        formats_to_generate = ["txt"]
+    else:  # Default to docx only
+        formats_to_generate = ["docx"]
+    
     # Generate output files in both languages
     print(f"\n[6/6] Generating output files...")
     base_name = resume_file.stem
@@ -197,17 +208,6 @@ async def optimize_resume_cli(
             )
         except Exception:
             pass
-        
-        # Determine which formats to generate
-        formats_to_generate = []
-        if output_formats.lower() == "all":
-            formats_to_generate = ["docx", "md", "txt"]
-        elif output_formats.lower() == "md":
-            formats_to_generate = ["md"]
-        elif output_formats.lower() == "txt":
-            formats_to_generate = ["txt"]
-        else:  # Default to docx only
-            formats_to_generate = ["docx"]
         
         # Resume outputs
         try:
@@ -286,14 +286,16 @@ async def optimize_resume_cli(
 def main():
     """Main entry point."""
     if len(sys.argv) < 3:
-        print("Usage: python optimize_resume.py <resume_file> <job_url> [tone] [output_languages] [rag_file]")
+        print("Usage: python optimize_resume.py <resume_file> <job_url> [tone] [output_languages] [rag_file] [output_formats]")
         print("\nExamples:")
         print("  python optimize_resume.py resume.docx https://hh.ru/vacancy/123456789")
         print("  python optimize_resume.py resume.docx https://hh.ru/vacancy/123456789 balanced ru")
         print("  python optimize_resume.py resume.docx https://hh.ru/vacancy/123456789 balanced both knowledge_base.txt")
+        print("  python optimize_resume.py resume.docx https://hh.ru/vacancy/123456789 balanced ru '' all")
         print("\nTone options: conservative, balanced (default), aggressive")
         print("Output languages: 'ru' (Russian only, default), 'en' (English only), 'both' (both languages)")
         print("RAG file: Optional path to knowledge base file for enhanced context")
+        print("Output formats: 'docx' (default), 'md', 'txt', 'all' (all formats)")
         sys.exit(1)
     
     resume_path = sys.argv[1]
