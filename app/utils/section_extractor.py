@@ -335,74 +335,73 @@ class SectionExtractor:
         if not lines:
             return None
 
-        # Modern resume format: Title / Company / Dates / Bullets
-        # Try to identify which line is which
+        # Standard resume format: Title / Company / Dates / Bullets
+        # Bullets start with - or • or *
         title = ""
         company = ""
         dates = ""
         bullets = []
         
-        date_pattern = r"(\d{4}|\d{1,2}/\d{4}|(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})"
+        date_pattern = r"\b(19|20)\d{2}\b"
         
-        line_idx = 0
+        # Separate lines into header (title/company/dates) and bullets
+        header_lines = []
+        bullet_lines = []
         
-        # First line is usually the title (unless it has dates)
-        if line_idx < len(lines):
-            first_line = lines[line_idx]
-            if re.search(date_pattern, first_line, re.IGNORECASE):
-                # Dates in first line, extract them
-                dates_match = re.search(
-                    r"(" + date_pattern + r"(\s*[-–—]\s*" + date_pattern + r"|Present|Current)?)",
-                    first_line,
-                    re.IGNORECASE,
-                )
-                if dates_match:
-                    dates = dates_match.group(0).strip()
-                    title = re.sub(r"(" + date_pattern + r"(\s*[-–—]\s*" + date_pattern + r"|Present|Current)?)", "", first_line, flags=re.IGNORECASE).strip()
-                line_idx += 1
+        for line in lines:
+            # Check if this is a bullet point
+            if line.startswith(('-', '•', '*')) or re.match(r'^\d+[.)]', line):
+                bullet_lines.append(line)
             else:
-                # No dates in first line, it's the title
-                title = first_line
-                line_idx += 1
+                # If we haven't started bullets yet, this is a header line
+                if not bullet_lines:
+                    header_lines.append(line)
+                else:
+                    # After bullets started, non-bullet lines are still bullets (continuation)
+                    bullet_lines.append(line)
         
-        # Second line is usually company (unless it's dates)
-        if line_idx < len(lines):
-            second_line = lines[line_idx]
-            if re.search(date_pattern, second_line, re.IGNORECASE):
-                # This line has dates
+        # Parse header lines (should be 2-3 lines: title, company, dates)
+        for i, line in enumerate(header_lines):
+            has_date = bool(re.search(date_pattern, line))
+            
+            if i == 0 and not has_date:
+                # First line without date = title
+                title = line
+            elif i == 1 and not has_date:
+                # Second line without date = company
+                company = line
+            elif has_date:
+                # Line with date = dates
                 dates_match = re.search(
-                    r"(" + date_pattern + r"(\s*[-–—]\s*" + date_pattern + r"|Present|Current)?)",
-                    second_line,
+                    r"(" + date_pattern + r"(\s*[-–—]\s*(" + date_pattern + r"|Present|Current))?)",
+                    line,
                     re.IGNORECASE,
                 )
                 if dates_match:
                     dates = dates_match.group(0).strip()
-                line_idx += 1
-            else:
-                # No dates, this is the company
-                company = second_line
-                line_idx += 1
+                # If there's text before dates on same line, it might be company
+                text_before_date = re.sub(
+                    r"(" + date_pattern + r"(\s*[-–—]\s*(" + date_pattern + r"|Present|Current))?)",
+                    "",
+                    line,
+                    flags=re.IGNORECASE
+                ).strip()
+                if text_before_date and not company:
+                    company = text_before_date
+            elif not title and not company:
+                # Fallback: first non-date line is title
+                title = line
+            elif title and not company:
+                # Second non-date line is company
+                company = line
         
-        # Third line might be dates if we haven't found them yet
-        if line_idx < len(lines) and not dates:
-            third_line = lines[line_idx]
-            if re.search(date_pattern, third_line, re.IGNORECASE):
-                dates_match = re.search(
-                    r"(" + date_pattern + r"(\s*[-–—]\s*" + date_pattern + r"|Present|Current)?)",
-                    third_line,
-                    re.IGNORECASE,
-                )
-                if dates_match:
-                    dates = dates_match.group(0).strip()
-                    line_idx += 1
-        
-        # Remaining lines are bullets
-        for line in lines[line_idx:]:
+        # Parse bullets
+        for line in bullet_lines:
             # Remove bullet markers
-            line = re.sub(r"^[-•*]\s*", "", line)
-            line = re.sub(r"^\d+[.)]\s*", "", line)
-            if line.strip():
-                bullets.append(line.strip())
+            cleaned = re.sub(r"^[-•*]\s*", "", line)
+            cleaned = re.sub(r"^\d+[.)]\s*", "", cleaned)
+            if cleaned.strip():
+                bullets.append(cleaned.strip())
 
         return Experience(
             title=title or "Unknown",
