@@ -1,21 +1,28 @@
-"""Generate enhanced resume sections."""
+"""Generate enhanced resume sections - PRESERVES ALL STRUCTURE."""
 
 import re
 from typing import List, Optional
 
 from app.generators.llm_client import LLMClient
 from app.generators.prompt_builder import PromptBuilder
+from app.generators.resume_enhancer import ResumeEnhancer
 from app.models import Experience, JobPosting, ParsedResume
 from app.utils.llm_cache import llm_cache
 
 
 class ResumeGenerator:
-    """Generate enhanced resume sections."""
+    """
+    Generate enhanced resume sections.
+    
+    IMPORTANT: This class now uses ResumeEnhancer which preserves ALL structure
+    and sections from the original resume, only enhancing content with keywords.
+    """
 
     def __init__(self):
         """Initialize generator."""
         self.llm = LLMClient()
         self.prompt_builder = PromptBuilder()
+        self.enhancer = ResumeEnhancer()  # Use enhancer for structure preservation
 
     def generate_enhanced_resume(
         self,
@@ -27,42 +34,23 @@ class ResumeGenerator:
     ) -> ParsedResume:
         """
         Generate enhanced resume optimized for job posting.
+        
+        PRESERVES ALL STRUCTURE AND SECTIONS from original resume.
+        Only enhances existing content with keywords from job posting.
 
         Args:
             resume: Original parsed resume
             job: Job posting
-            tone: Generation tone
+            tone: Enhancement tone (conservative, balanced, aggressive)
             max_keywords: Max keywords to add per section
+            rag_context: Optional RAG knowledge base context
 
         Returns:
-            Enhanced ParsedResume
+            Enhanced ParsedResume with ALL original sections preserved
         """
-        # Generate enhanced summary (fallback to original if fails)
-        enhanced_summary = self.generate_summary(resume, job, tone, rag_context)
-        if not enhanced_summary:
-            enhanced_summary = resume.summary
-
-        # Generate enhanced experience (fallback to original if fails or empty)
-        enhanced_experience = self.generate_experience(resume, job, tone, rag_context)
-        if not enhanced_experience:
-            enhanced_experience = resume.experience
-
-        # Generate enhanced skills (fallback to original if fails or empty)
-        enhanced_skills = self.generate_skills(resume, job, max_keywords, rag_context)
-        if not enhanced_skills:
-            enhanced_skills = resume.skills
-
-        # Create enhanced resume - always preserve original data
-        enhanced_resume = ParsedResume(
-            contact=resume.contact,
-            summary=enhanced_summary or resume.summary,
-            experience=enhanced_experience or resume.experience,
-            skills=enhanced_skills or resume.skills,
-            education=resume.education,
-            certifications=resume.certifications,
-            languages=resume.languages,
-            language=resume.language,
-            raw_text=resume.raw_text,  # Keep original raw text
+        # Use enhancer which preserves all structure
+        enhanced_resume = self.enhancer.enhance_resume(
+            resume, job, tone, rag_context
         )
 
         return enhanced_resume
