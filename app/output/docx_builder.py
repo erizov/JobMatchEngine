@@ -83,6 +83,20 @@ class DocxBuilder:
             for edu in resume.education:
                 self._add_education_entry(doc, edu)
 
+        # Add certifications (if present)
+        if resume.certifications:
+            cert_header = "Сертификаты" if language == "ru" else "Certifications"
+            self._add_section_header(doc, cert_header)
+            for cert in resume.certifications:
+                self._add_paragraph(doc, cert)
+
+        # Add languages (if present)
+        if resume.languages:
+            lang_header = "Языки" if language == "ru" else "Languages"
+            self._add_section_header(doc, lang_header)
+            langs_text = ", ".join(resume.languages)
+            self._add_paragraph(doc, langs_text)
+
         # Save document
         doc.save(str(output_path))
     
