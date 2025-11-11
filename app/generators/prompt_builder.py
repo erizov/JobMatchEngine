@@ -69,13 +69,15 @@ Candidate Background:
 - Key Skills: {', '.join(resume.skills[:10])}
 
 Instructions:
-1. Create a 3-4 sentence professional summary (50-80 words)
+1. Create a comprehensive 4-6 sentence professional summary (80-120 words)
 2. Highlight relevant experience and skills that match the job
 3. Include key keywords from job requirements naturally
 4. Maintain professional tone
 5. DO NOT invent facts, companies, or experiences not in the original
 6. Preserve the candidate's actual background - use REAL name and contact info from resume
 7. Write COMPLETELY in {target_language.upper()} language
+8. Be specific about years of experience, key technologies, and achievements
+9. Make it detailed and comprehensive, not brief
 
 Generate the optimized summary:"""
 
