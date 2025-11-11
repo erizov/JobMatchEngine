@@ -151,22 +151,47 @@ class ResumeGenerator:
                         prompt, 
                         system_prompt=system_prompt, 
                         temperature=0.7,
-                        max_tokens=800  # Allow enough tokens for full experience bullets
+                        max_tokens=1200  # Increased to allow full experience bullets with more detail
                     )
                     # Cache the response
                     if response:
                         llm_cache.set(prompt, response, system_prompt)
 
-                # Parse bullets from response
-                bullets = self._parse_bullets(response)
+                # Check if response contains error messages
+                if response and any(err in response.lower() for err in ["i apologize", "i cannot", "error", "sorry", "unable"]):
+                    # If LLM returned an error, use original bullets
+                    print(f"         [WARN] LLM returned error message for {exp.title}, using original bullets")
+                    final_bullets = exp.bullets if exp.bullets else []
+                else:
+                    # Parse bullets from response
+                    bullets = self._parse_bullets(response)
+                    
+                    # Ensure we have bullets - use original if LLM didn't generate any
+                    final_bullets = bullets if bullets else (exp.bullets if exp.bullets else [])
+                
+                # If still no bullets, try to extract from raw_text
+                if not final_bullets and exp.raw_text:
+                    # Extract lines that look like bullets
+                    lines = [line.strip() for line in exp.raw_text.split("\n") if line.strip()]
+                    potential_bullets = []
+                    for line in lines:
+                        # Skip headers, dates, titles, error messages
+                        if (len(line) > 15 and 
+                            not any(skip in line.lower() for skip in ["title:", "company:", "dates:", "experience", "summary", "i apologize", "i cannot", "error", "sorry"])):
+                            # Remove bullet markers
+                            clean_line = line.lstrip("-•* ").strip()
+                            if clean_line:
+                                potential_bullets.append(clean_line)
+                    if potential_bullets:
+                        final_bullets = potential_bullets[:5]  # Limit to 5
 
-                # Create enhanced experience entry
+                # Create enhanced experience entry - always include even if bullets are empty
                 enhanced_exp = Experience(
                     title=exp.title,
                     company=exp.company,
                     dates=exp.dates,
                     location=exp.location,
-                    bullets=bullets if bullets else exp.bullets,
+                    bullets=final_bullets if final_bullets else [],  # Empty list instead of None
                     raw_text=exp.raw_text,
                 )
                 enhanced_experience.append(enhanced_exp)

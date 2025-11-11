@@ -213,6 +213,16 @@ async def process_resume_file(
                     github=lang_resume.contact.github,
                 )
 
+            # Regenerate resume content in target language to ensure full content
+            # This ensures the resume is fully generated in the correct language with all sections
+            try:
+                lang_resume = resume_generator.generate_enhanced_resume(
+                    lang_resume, job, tone=tone, max_keywords=3
+                )
+            except Exception as e:
+                # If regeneration fails, use the enhanced resume as-is
+                print(f"         [WARN] Could not regenerate resume in {lang_code}: {e}")
+
             # Generate language-specific cover letter
             # Always generate in the target language to ensure proper language and contact info
             lang_cover_letter = cover_letter

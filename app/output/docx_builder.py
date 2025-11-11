@@ -47,12 +47,28 @@ class DocxBuilder:
         # Add experience
         if resume.experience:
             self._add_section_header(doc, headers["experience"])
+            valid_experience_count = 0
             for exp in resume.experience:
                 # Only add valid experience entries (skip malformed ones)
                 if exp.title and exp.title != "Unknown" and exp.title.strip():
-                    # Skip if title looks like a section header or summary text
-                    if not any(keyword in exp.title.lower() for keyword in ["experience", "summary", "skills", "education", "опыт", "резюме", "навыки", "образование"]):
-                        self._add_experience_entry(doc, exp, language)
+                    # Skip if title looks like a section header (but be less aggressive)
+                    title_lower = exp.title.lower().strip()
+                    # Only skip if it's EXACTLY a section header word, not if it contains it
+                    section_keywords = ["experience", "summary", "skills", "education", "опыт работы", "резюме", "навыки", "образование"]
+                    is_section_header = title_lower in [kw.lower() for kw in section_keywords] or title_lower == "опыт"
+                    
+                    # Also skip if it's just a date or bullet marker
+                    is_date_or_marker = title_lower in ["- present", "present", "-", "•"] or title_lower.startswith("- ")
+                    
+                    if not is_section_header and not is_date_or_marker:
+                        # Include if it has bullets OR if it's a valid job title
+                        if exp.bullets or len(title_lower) > 3:  # Allow entries with no bullets if title looks valid
+                            self._add_experience_entry(doc, exp, language)
+                            valid_experience_count += 1
+            
+            # If no valid experience entries were added, add a note
+            if valid_experience_count == 0 and resume.experience:
+                doc.add_paragraph("Experience details are being processed.")
 
         # Add skills
         if resume.skills:
@@ -177,19 +193,33 @@ class DocxBuilder:
         para = doc.add_paragraph()
         run = para.add_run(exp.title)
         run.bold = True
-        if exp.company and exp.company != "Unknown":
+        if exp.company and exp.company != "Unknown" and exp.company.strip():
             separator = " в " if language == "ru" else " at "
             para.add_run(f"{separator}{exp.company}")
 
         # Dates
-        if exp.dates:
+        if exp.dates and exp.dates.strip():
             para = doc.add_paragraph(exp.dates)
             para.italic = True
 
-        # Bullets
-        for bullet in exp.bullets:
-            if bullet and bullet.strip():
-                para = doc.add_paragraph(bullet, style="List Bullet")
+        # Bullets - ensure we add them even if empty, but try to preserve original if LLM failed
+        if exp.bullets:
+            for bullet in exp.bullets:
+                if bullet and bullet.strip():
+                    # Clean up bullet text
+                    bullet_clean = bullet.strip()
+                    # Remove leading dashes/bullets if present
+                    bullet_clean = bullet_clean.lstrip("-•* ").strip()
+                    if bullet_clean:
+                        para = doc.add_paragraph(bullet_clean, style="List Bullet")
+        else:
+            # If no bullets, add a placeholder or use raw_text if available
+            if exp.raw_text and exp.raw_text.strip():
+                # Try to extract meaningful content from raw_text
+                raw_lines = [line.strip() for line in exp.raw_text.split("\n") if line.strip()]
+                for line in raw_lines[:5]:  # Limit to 5 lines
+                    if len(line) > 10 and not line.lower().startswith(("title:", "company:", "dates:")):
+                        para = doc.add_paragraph(line, style="List Bullet")
 
         doc.add_paragraph()  # Spacing
 
