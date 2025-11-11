@@ -83,6 +83,7 @@ Generate the optimized summary:"""
         experience: Experience,
         job: JobPosting,
         tone: str = "balanced",
+        rag_context: Optional[str] = None,
     ) -> str:
         """
         Build prompt for optimizing experience bullets.
@@ -144,6 +145,7 @@ Generate optimized bullets (one per line, with - prefix):"""
         original_skills: List[str],
         job: JobPosting,
         max_additions: int = 3,
+        rag_context: Optional[str] = None,
     ) -> str:
         """
         Build prompt for optimizing skills section.

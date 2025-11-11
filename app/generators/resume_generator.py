@@ -130,7 +130,7 @@ class ResumeGenerator:
         enhanced_experience = []
 
         for exp in resume.experience:
-            prompt = self.prompt_builder.generate_experience_bullet_prompt(
+            prompt = self.prompt_builder.build_experience_bullet_prompt(
                 exp, job, tone, rag_context
             )
 
