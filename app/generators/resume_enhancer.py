@@ -174,6 +174,113 @@ Enhanced summary (preserve original + add keywords):"""
             print(f"Warning: Summary enhancement failed: {e}")
             return original_summary
 
+    def _create_summary_from_experience(
+        self,
+        resume: ParsedResume,
+        job: JobPosting,
+        tone: str,
+        rag_context: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Create a summary from experience and skills when none exists.
+        
+        This preserves the structure by ensuring a summary section exists.
+        """
+        target_language = resume.language or "en"
+        keywords = job.must_have_keywords[:10]
+
+        # Build summary from experience entries
+        experience_summary = []
+        if resume.experience:
+            for exp in resume.experience[:3]:  # Use first 3 experiences
+                if exp.title and len(exp.title) > 20:
+                    experience_summary.append(exp.title)
+        
+        # Combine with skills
+        skills_text = ", ".join(resume.skills[:10]) if resume.skills else ""
+        
+        rag_section = ""
+        if rag_context:
+            rag_section = f"""
+Additional Context (Knowledge Base):
+{rag_context[:2000]}
+
+"""
+
+        prompt = f"""Create a professional resume summary from the candidate's experience and skills.
+
+CRITICAL: Use ONLY the actual information provided. DO NOT invent facts.
+
+{rag_section}Job Title: {job.title}
+Relevant Keywords: {', '.join(keywords)}
+
+Candidate Experience:
+{chr(10).join(experience_summary[:3]) if experience_summary else 'No specific experience provided'}
+
+Candidate Skills:
+{skills_text if skills_text else 'No skills listed'}
+
+Instructions:
+1. Create a 4-6 sentence professional summary (80-120 words)
+2. Highlight relevant experience and skills that match the job
+3. Include key keywords from job requirements naturally
+4. Maintain professional tone
+5. DO NOT invent facts, companies, or experiences
+6. Write COMPLETELY in {target_language.upper()} language
+7. Be specific about years of experience, key technologies, and achievements
+
+Generate the professional summary:"""
+
+        system_prompt = (
+            "You are a professional resume writer. Create a professional summary "
+            "from the candidate's actual experience and skills."
+        )
+
+        if target_language == "ru":
+            system_prompt = (
+                "Вы профессиональный писатель резюме. Создайте профессиональное "
+                "резюме на основе фактического опыта и навыков кандидата. "
+                "Пишите ПОЛНОСТЬЮ на русском языке."
+            )
+
+        try:
+            # Check cache
+            cached_response = llm_cache.get(prompt, system_prompt)
+            if cached_response:
+                if target_language == "ru":
+                    russian_chars = sum(
+                        1 for c in cached_response if '\u0400' <= c <= '\u04FF'
+                    )
+                    if russian_chars < len(cached_response) * 0.3:
+                        cached_response = None
+
+                if cached_response:
+                    from app.utils.token_tracker import token_tracker
+                    token_tracker.add_usage(cached=True)
+                    return cached_response.strip()
+
+            if not cached_response:
+                summary = self.llm.generate(
+                    prompt,
+                    system_prompt=system_prompt,
+                    temperature=0.7,
+                    max_tokens=400,
+                )
+                if summary:
+                    llm_cache.set(prompt, summary, system_prompt)
+                    # Clean up response
+                    summary = summary.strip()
+                    import re
+                    summary = re.sub(r"```[\w]*\n?", "", summary)
+                    summary = re.sub(r"```", "", summary)
+                    summary = summary.strip()
+                    return summary
+
+            return None
+        except Exception as e:
+            print(f"Warning: Summary creation failed: {e}")
+            return None
+
     def _enhance_experience(
         self,
         original_experience: List[Experience],

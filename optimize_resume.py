@@ -127,6 +127,7 @@ async def optimize_resume_cli(
     
     # Generate enhanced resume
     print(f"\n[5/5] Generating enhanced resume and cover letter...")
+    match_after = None
     try:
         enhanced_resume = resume_generator.generate_enhanced_resume(
             resume, job, tone=tone, max_keywords=3, rag_context=rag_context
@@ -140,6 +141,7 @@ async def optimize_resume_cli(
         print(f"       [WARN] LLM enhancement failed: {e}")
         print(f"       [INFO] Using original resume")
         enhanced_resume = resume
+        match_after = match_before
     
     # Generate cover letter
     try:
