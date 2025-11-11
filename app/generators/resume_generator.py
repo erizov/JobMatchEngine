@@ -86,13 +86,26 @@ class ResumeGenerator:
         )
 
         try:
-            # Check cache first
-            cached_response = llm_cache.get(prompt, system_prompt)
+            # For language-specific generation, don't use cache if it's a different language
+            # This ensures we get fresh Russian content, not cached English
+            target_language = resume.language or "en"
+            use_cache = True  # Can use cache if language matches
+            
+            cached_response = llm_cache.get(prompt, system_prompt) if use_cache else None
             if cached_response:
-                summary = cached_response
-                from app.utils.token_tracker import token_tracker
-                token_tracker.add_usage(cached=True)
-            else:
+                # Check if cached response is in the correct language
+                if target_language == "ru":
+                    # If Russian, verify it's actually in Russian (not English)
+                    russian_chars = sum(1 for c in cached_response if '\u0400' <= c <= '\u04FF')
+                    if russian_chars < len(cached_response) * 0.3:  # Less than 30% Russian chars
+                        cached_response = None  # Don't use English cached response for Russian
+                
+                if cached_response:
+                    summary = cached_response
+                    from app.utils.token_tracker import token_tracker
+                    token_tracker.add_usage(cached=True)
+            
+            if not cached_response:
                 summary = self.llm.generate(
                     prompt, 
                     system_prompt=system_prompt, 
@@ -113,6 +126,13 @@ class ResumeGenerator:
                 summary = re.sub(r"```[\w]*\n?", "", summary)
                 summary = re.sub(r"```", "", summary)
                 summary = summary.strip()
+                
+                # Check for error messages and skip them
+                error_phrases = ["извините", "не могу", "cannot", "sorry", "unable", "error", "i apologize"]
+                if any(phrase.lower() in summary.lower() for phrase in error_phrases):
+                    print(f"Warning: Summary contains error message, using original")
+                    return resume.summary
+                    
             return summary if summary else resume.summary
         except Exception as e:
             # Fallback to original if generation fails
@@ -158,13 +178,22 @@ class ResumeGenerator:
                 )
 
             try:
-                # Check cache first
+                # For language-specific generation, check cache but verify language
                 cached_response = llm_cache.get(prompt, system_prompt)
                 if cached_response:
-                    response = cached_response
-                    from app.utils.token_tracker import token_tracker
-                    token_tracker.add_usage(cached=True)
-                else:
+                    # Check if cached response is in the correct language
+                    if target_language == "ru":
+                        # If Russian, verify it's actually in Russian (not English)
+                        russian_chars = sum(1 for c in cached_response if '\u0400' <= c <= '\u04FF')
+                        if russian_chars < len(cached_response) * 0.3:  # Less than 30% Russian chars
+                            cached_response = None  # Don't use English cached response for Russian
+                    
+                    if cached_response:
+                        response = cached_response
+                        from app.utils.token_tracker import token_tracker
+                        token_tracker.add_usage(cached=True)
+                
+                if not cached_response:
                     response = self.llm.generate(
                         prompt, 
                         system_prompt=system_prompt, 
@@ -248,13 +277,22 @@ class ResumeGenerator:
             )
 
         try:
-            # Check cache first
+            # For language-specific generation, check cache but verify language
             cached_response = llm_cache.get(prompt, system_prompt)
             if cached_response:
-                response = cached_response
-                from app.utils.token_tracker import token_tracker
-                token_tracker.add_usage(cached=True)
-            else:
+                # Check if cached response is in the correct language
+                if target_language == "ru":
+                    # If Russian, verify it's actually in Russian (not English)
+                    russian_chars = sum(1 for c in cached_response if '\u0400' <= c <= '\u04FF')
+                    if russian_chars < len(cached_response) * 0.3:  # Less than 30% Russian chars
+                        cached_response = None  # Don't use English cached response for Russian
+                
+                if cached_response:
+                    response = cached_response
+                    from app.utils.token_tracker import token_tracker
+                    token_tracker.add_usage(cached=True)
+            
+            if not cached_response:
                 response = self.llm.generate(
                     prompt, 
                     system_prompt=system_prompt, 
