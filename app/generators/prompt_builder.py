@@ -136,13 +136,15 @@ Instructions:
 1. Rewrite each bullet to be achievement-focused (use action verbs)
 2. Include relevant keywords from job requirements where applicable
 3. Add quantifiable metrics if mentioned in original (DO NOT invent numbers)
-4. Keep each bullet to 10-20 words (can be longer if needed for clarity)
+4. Keep each bullet to 15-25 words (can be longer if needed for clarity and detail)
 5. Maintain all factual information (company, dates, role)
 6. Use strong action verbs (developed, implemented, led, etc.)
 7. Use REAL company names and actual experience from resume
 8. Generate ALL bullets from the original - do not skip any
-9. If original has no bullets, create 3-5 relevant bullets based on the job title and company
+9. If original has no bullets, create 4-6 detailed relevant bullets based on the job title and company
 10. Write COMPLETELY in the same language as the resume (Russian or English)
+11. Be detailed and comprehensive - expand on achievements and responsibilities
+12. Include specific technologies, methodologies, and results where applicable
 
 Generate optimized bullets (one per line, with - prefix). Include ALL bullets:"""
 
