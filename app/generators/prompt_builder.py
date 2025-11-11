@@ -17,14 +17,17 @@ class PromptBuilder:
         resume: ParsedResume,
         job: JobPosting,
         tone: str = "balanced",
+        rag_context: Optional[str] = None,
     ) -> str:
         """
         Build prompt for generating optimized resume summary.
 
         Args:
             original_summary: Original summary text
+            resume: Parsed resume
             job: Job posting
             tone: Generation tone (conservative, balanced, aggressive)
+            rag_context: Optional RAG knowledge base context
 
         Returns:
             Prompt string
