@@ -97,7 +97,7 @@ class ResumeGenerator:
                     prompt, 
                     system_prompt=system_prompt, 
                     temperature=0.7,
-                    max_tokens=500  # Allow enough tokens for full summary
+                    max_tokens=800  # Increased to allow comprehensive summary (80-120 words)
                 )
                 # Cache the response
                 if summary:
