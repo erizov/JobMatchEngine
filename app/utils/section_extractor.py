@@ -280,22 +280,48 @@ class SectionExtractor:
         lines = section_text.split("\n")
         entries = []
         current_entry = []
+        
+        # Skip section header line
+        skip_first = False
+        if lines and any(pattern.match(lines[0].strip()) for pattern in [
+            re.compile(r"(?i)^(experience|work experience|employment|work history|опыт работы)")
+        ]):
+            lines = lines[1:]
+            skip_first = True
 
-        for line in lines:
-            line = line.strip()
-            if not line:
+        for i, line in enumerate(lines):
+            line_stripped = line.strip()
+            if not line_stripped:
                 if current_entry:
                     entries.append("\n".join(current_entry))
                     current_entry = []
                 continue
 
-            # Check if this looks like a new entry (has dates or company pattern)
-            # Pattern: Title | Company | Dates or Company - Title | Dates
-            date_pattern = r"\d{4}|\d{1,2}/\d{4}|(Jan|Feb|Mar|Apr|May|Jun|"
-            date_pattern += r"Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}"
-            if re.search(date_pattern, line, re.IGNORECASE) and current_entry:
-                entries.append("\n".join(current_entry))
-                current_entry = [line]
+            # Check if this is the start of a new entry
+            # A new entry starts with a job title (non-bullet, non-date line)
+            # followed by company and dates
+            is_bullet = line_stripped.startswith(('-', '•', '*')) or re.match(r'^\d+[.)]', line_stripped)
+            is_date_line = bool(re.search(r'\d{4}|\d{1,2}/\d{4}|(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}', line_stripped, re.IGNORECASE))
+            
+            # If we have a current entry and this line is not a bullet or date
+            # and the next lines look like company/dates, this is a new entry
+            if current_entry and not is_bullet:
+                # Check if this could be a new job title
+                # (not a date line, and next line might be company or date)
+                next_line_is_company_or_date = False
+                if i + 1 < len(lines):
+                    next_line = lines[i + 1].strip()
+                    next_line_has_date = bool(re.search(r'\d{4}', next_line))
+                    next_line_is_bullet = next_line.startswith(('-', '•', '*'))
+                    next_line_is_company_or_date = next_line_has_date or (not next_line_is_bullet and len(next_line) < 50)
+                
+                # If current line doesn't have dates and looks like a title, and next line is company/dates
+                if not is_date_line and next_line_is_company_or_date and len(line_stripped) > 5:
+                    # This is a new entry
+                    entries.append("\n".join(current_entry))
+                    current_entry = [line]
+                else:
+                    current_entry.append(line)
             else:
                 current_entry.append(line)
 
@@ -310,50 +336,69 @@ class SectionExtractor:
         if not lines:
             return None
 
-        # First line usually has title, company, dates
-        first_line = lines[0]
-
-        # Extract dates (usually at the end)
-        date_pattern = r"(\d{4}|\d{1,2}/\d{4}|(Jan|Feb|Mar|Apr|May|Jun|"
-        date_pattern += r"Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})"
-        dates_match = re.search(
-            r"(" + date_pattern + r"(\s*[-–—]\s*" + date_pattern + r")?)",
-            first_line,
-            re.IGNORECASE,
-        )
-        dates = dates_match.group(0).strip() if dates_match else ""
-
-        # Remove dates from first line
-        title_company = re.sub(date_pattern + r"(\s*[-–—]\s*" + date_pattern + r")?", "", first_line).strip()
-
-        # Try to split title and company
-        # Common patterns: "Title at Company", "Company - Title", "Title | Company"
-        title = title_company
+        # Modern resume format: Title / Company / Dates / Bullets
+        # Try to identify which line is which
+        title = ""
         company = ""
-
-        if " at " in title_company.lower():
-            parts = title_company.split(" at ", 1)
-            title = parts[0].strip()
-            company = parts[1].strip() if len(parts) > 1 else ""
-        elif " | " in title_company:
-            parts = title_company.split(" | ", 1)
-            title = parts[0].strip()
-            company = parts[1].strip() if len(parts) > 1 else ""
-        elif " - " in title_company:
-            parts = title_company.split(" - ", 1)
-            # Could be either order
-            if len(parts) == 2:
-                # Heuristic: if first part is shorter, it's likely company
-                if len(parts[0]) < len(parts[1]):
-                    company = parts[0].strip()
-                    title = parts[1].strip()
-                else:
-                    title = parts[0].strip()
-                    company = parts[1].strip()
-
-        # Bullets are remaining lines
+        dates = ""
         bullets = []
-        for line in lines[1:]:
+        
+        date_pattern = r"(\d{4}|\d{1,2}/\d{4}|(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})"
+        
+        line_idx = 0
+        
+        # First line is usually the title (unless it has dates)
+        if line_idx < len(lines):
+            first_line = lines[line_idx]
+            if re.search(date_pattern, first_line, re.IGNORECASE):
+                # Dates in first line, extract them
+                dates_match = re.search(
+                    r"(" + date_pattern + r"(\s*[-–—]\s*" + date_pattern + r"|Present|Current)?)",
+                    first_line,
+                    re.IGNORECASE,
+                )
+                if dates_match:
+                    dates = dates_match.group(0).strip()
+                    title = re.sub(r"(" + date_pattern + r"(\s*[-–—]\s*" + date_pattern + r"|Present|Current)?)", "", first_line, flags=re.IGNORECASE).strip()
+                line_idx += 1
+            else:
+                # No dates in first line, it's the title
+                title = first_line
+                line_idx += 1
+        
+        # Second line is usually company (unless it's dates)
+        if line_idx < len(lines):
+            second_line = lines[line_idx]
+            if re.search(date_pattern, second_line, re.IGNORECASE):
+                # This line has dates
+                dates_match = re.search(
+                    r"(" + date_pattern + r"(\s*[-–—]\s*" + date_pattern + r"|Present|Current)?)",
+                    second_line,
+                    re.IGNORECASE,
+                )
+                if dates_match:
+                    dates = dates_match.group(0).strip()
+                line_idx += 1
+            else:
+                # No dates, this is the company
+                company = second_line
+                line_idx += 1
+        
+        # Third line might be dates if we haven't found them yet
+        if line_idx < len(lines) and not dates:
+            third_line = lines[line_idx]
+            if re.search(date_pattern, third_line, re.IGNORECASE):
+                dates_match = re.search(
+                    r"(" + date_pattern + r"(\s*[-–—]\s*" + date_pattern + r"|Present|Current)?)",
+                    third_line,
+                    re.IGNORECASE,
+                )
+                if dates_match:
+                    dates = dates_match.group(0).strip()
+                    line_idx += 1
+        
+        # Remaining lines are bullets
+        for line in lines[line_idx:]:
             # Remove bullet markers
             line = re.sub(r"^[-•*]\s*", "", line)
             line = re.sub(r"^\d+[.)]\s*", "", line)
