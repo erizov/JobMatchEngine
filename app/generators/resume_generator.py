@@ -128,11 +128,20 @@ class ResumeGenerator:
     ) -> List[Experience]:
         """Generate enhanced experience entries."""
         enhanced_experience = []
+        
+        # Determine target language for prompts
+        target_language = resume.language or "en"
 
         for exp in resume.experience:
             prompt = self.prompt_builder.build_experience_bullet_prompt(
                 exp, job, tone, rag_context
             )
+            
+            # Add language-specific instruction to prompt
+            if target_language == "ru":
+                prompt += "\n\nCRITICAL: Write ALL bullets COMPLETELY in Russian language. Use Russian grammar, vocabulary, and technical terms. DO NOT use English words or phrases."
+            else:
+                prompt += "\n\nCRITICAL: Write ALL bullets COMPLETELY in English language. Use English grammar and vocabulary."
 
             system_prompt = (
                 "You are a professional resume writer. Optimize experience "

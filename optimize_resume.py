@@ -24,6 +24,7 @@ async def optimize_resume_cli(
     tone: str = "balanced",
     output_languages: str = None,
     rag_file: Optional[str] = None,
+    output_formats: str = "docx",
 ):
     """
     Optimize resume with job vacancy URL.
@@ -197,48 +198,65 @@ async def optimize_resume_cli(
         except Exception:
             pass
         
+        # Determine which formats to generate
+        formats_to_generate = []
+        if output_formats.lower() == "all":
+            formats_to_generate = ["docx", "md", "txt"]
+        elif output_formats.lower() == "md":
+            formats_to_generate = ["md"]
+        elif output_formats.lower() == "txt":
+            formats_to_generate = ["txt"]
+        else:  # Default to docx only
+            formats_to_generate = ["docx"]
+        
         # Resume outputs
         try:
-            docx_builder.build_resume(
-                lang_resume,
-                output_dir / f"{base_name}_enhanced{lang_suffix}.docx",
-            )
-            print(f"         [OK] {base_name}_enhanced{lang_suffix}.docx")
+            if "docx" in formats_to_generate:
+                docx_builder.build_resume(
+                    lang_resume,
+                    output_dir / f"{base_name}_enhanced{lang_suffix}.docx",
+                )
+                print(f"         [OK] {base_name}_enhanced{lang_suffix}.docx")
             
-            md_builder.build_resume(
-                lang_resume, output_dir / f"{base_name}_enhanced{lang_suffix}.md"
-            )
-            print(f"         [OK] {base_name}_enhanced{lang_suffix}.md")
+            if "md" in formats_to_generate:
+                md_builder.build_resume(
+                    lang_resume, output_dir / f"{base_name}_enhanced{lang_suffix}.md"
+                )
+                print(f"         [OK] {base_name}_enhanced{lang_suffix}.md")
             
-            txt_builder.build_resume(
-                lang_resume, output_dir / f"{base_name}_enhanced{lang_suffix}.txt"
-            )
-            print(f"         [OK] {base_name}_enhanced{lang_suffix}.txt")
+            if "txt" in formats_to_generate:
+                txt_builder.build_resume(
+                    lang_resume, output_dir / f"{base_name}_enhanced{lang_suffix}.txt"
+                )
+                print(f"         [OK] {base_name}_enhanced{lang_suffix}.txt")
         except Exception as e:
             print(f"         [ERROR] Failed to generate {lang_code} resume: {e}")
         
         # Cover letter outputs
         try:
-            docx_builder.build_cover_letter(
-                lang_cover_letter,
-                lang_resume.contact,
-                output_dir / f"{base_name}_cover_letter{lang_suffix}.docx",
-            )
-            print(f"         [OK] {base_name}_cover_letter{lang_suffix}.docx")
+            if "docx" in formats_to_generate:
+                docx_builder.build_cover_letter(
+                    lang_cover_letter,
+                    lang_resume.contact,
+                    output_dir / f"{base_name}_cover_letter{lang_suffix}.docx",
+                )
+                print(f"         [OK] {base_name}_cover_letter{lang_suffix}.docx")
             
-            md_builder.build_cover_letter(
-                lang_cover_letter,
-                lang_resume.contact,
-                output_dir / f"{base_name}_cover_letter{lang_suffix}.md",
-            )
-            print(f"         [OK] {base_name}_cover_letter{lang_suffix}.md")
+            if "md" in formats_to_generate:
+                md_builder.build_cover_letter(
+                    lang_cover_letter,
+                    lang_resume.contact,
+                    output_dir / f"{base_name}_cover_letter{lang_suffix}.md",
+                )
+                print(f"         [OK] {base_name}_cover_letter{lang_suffix}.md")
             
-            txt_builder.build_cover_letter(
-                lang_cover_letter,
-                lang_resume.contact,
-                output_dir / f"{base_name}_cover_letter{lang_suffix}.txt",
-            )
-            print(f"         [OK] {base_name}_cover_letter{lang_suffix}.txt")
+            if "txt" in formats_to_generate:
+                txt_builder.build_cover_letter(
+                    lang_cover_letter,
+                    lang_resume.contact,
+                    output_dir / f"{base_name}_cover_letter{lang_suffix}.txt",
+                )
+                print(f"         [OK] {base_name}_cover_letter{lang_suffix}.txt")
         except Exception as e:
             print(f"         [ERROR] Failed to generate {lang_code} cover letter: {e}")
     

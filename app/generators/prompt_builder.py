@@ -116,9 +116,16 @@ Additional Context (Knowledge Base):
 
 """
 
+        # Determine target language from resume context
+        # Note: This will be set by the caller based on lang_resume.language
+        target_language = "en"  # Default, will be overridden by resume.language
+        language_instruction_exp = ""
+        # We'll add language instruction based on the resume language passed in
+        
         prompt = f"""Optimize work experience bullets for ATS compatibility while preserving facts.
 
 CRITICAL: Use ONLY actual information from the candidate's resume. DO NOT use placeholder names or example data.
+CRITICAL: Write COMPLETELY in the target language specified below. DO NOT mix languages.
 
 {rag_section}Job Title: {job.title}
 Relevant Keywords: {', '.join(job.must_have_keywords[:8])}
@@ -142,9 +149,10 @@ Instructions:
 7. Use REAL company names and actual experience from resume
 8. Generate ALL bullets from the original - do not skip any
 9. If original has no bullets, create 4-6 detailed relevant bullets based on the job title and company
-10. Write COMPLETELY in the same language as the resume (Russian or English)
+10. Write COMPLETELY in the target language - if Russian, use ONLY Russian; if English, use ONLY English
 11. Be detailed and comprehensive - expand on achievements and responsibilities
 12. Include specific technologies, methodologies, and results where applicable
+13. DO NOT mix English and Russian in the same bullet - use ONE language consistently
 
 Generate optimized bullets (one per line, with - prefix). Include ALL bullets:"""
 
