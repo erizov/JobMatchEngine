@@ -190,10 +190,15 @@ class DocxBuilder:
 
     def _add_experience_entry(self, doc: Document, exp, language: str = "en") -> None:
         """Add experience entry."""
-        # Title and company
+        # Title and company - translate if needed
         para = doc.add_paragraph()
-        run = para.add_run(exp.title)
+        
+        # Use title as-is (should already be in target language from generation)
+        # But if it's clearly English and we need Russian, we could translate here
+        title_text = exp.title
+        run = para.add_run(title_text)
         run.bold = True
+        
         if exp.company and exp.company != "Unknown" and exp.company.strip():
             separator = " в " if language == "ru" else " at "
             para.add_run(f"{separator}{exp.company}")
