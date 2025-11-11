@@ -39,6 +39,11 @@ class ResumeEnhancer:
         Returns:
             Enhanced ParsedResume with all original sections preserved
         """
+        # Detect if we need to translate (English source -> Russian target)
+        source_lang = self._detect_content_language(resume)
+        target_lang = resume.language or "en"
+        needs_translation = (source_lang == "en" and target_lang == "ru")
+        
         # Enhance summary by adding keywords to existing text
         # If no summary exists, create one from experience and skills
         if not resume.summary:
@@ -49,16 +54,28 @@ class ResumeEnhancer:
             enhanced_summary = self._enhance_summary(
                 resume.summary, resume, job, tone, rag_context
             )
+            
+        # Translate summary if needed
+        if needs_translation and enhanced_summary:
+            enhanced_summary = self._translate_text(enhanced_summary, "ru")
 
         # Enhance experience bullets by adding keywords
         enhanced_experience = self._enhance_experience(
             resume.experience, resume, job, tone, rag_context
         )
+        
+        # Translate experience if needed
+        if needs_translation:
+            enhanced_experience = self._translate_experience(enhanced_experience, "ru")
 
         # Enhance skills by adding relevant keywords
         enhanced_skills = self._enhance_skills(
             resume.skills, resume, job, tone, rag_context
         )
+        
+        # Translate skills if needed
+        if needs_translation:
+            enhanced_skills = self._translate_skills(enhanced_skills, "ru")
 
         # Create enhanced resume - preserve ALL original sections
         enhanced_resume = ParsedResume(
@@ -547,4 +564,156 @@ Enhanced bullet (preserve original + add keywords if natural):"""
             ),
         }
         return instructions.get(tone, instructions["balanced"])
+
+    def _detect_content_language(self, resume: ParsedResume) -> str:
+        """Detect the actual language of resume content."""
+        # Check experience titles and bullets for language
+        if resume.experience:
+            for exp in resume.experience[:2]:
+                if exp.title:
+                    # Check for Cyrillic characters
+                    has_cyrillic = any('\u0400' <= c <= '\u04FF' for c in exp.title)
+                    if has_cyrillic:
+                        return "ru"
+                if exp.bullets:
+                    bullet_text = " ".join(exp.bullets[:2])
+                    has_cyrillic = any('\u0400' <= c <= '\u04FF' for c in bullet_text)
+                    if has_cyrillic:
+                        return "ru"
+        
+        # Check skills
+        if resume.skills:
+            skills_text = " ".join(resume.skills[:5])
+            has_cyrillic = any('\u0400' <= c <= '\u04FF' for c in skills_text)
+            if has_cyrillic:
+                return "ru"
+        
+        # Default to English if no Cyrillic found
+        return "en"
+
+    def _translate_text(self, text: str, target_lang: str) -> str:
+        """Translate text to target language."""
+        if not text or len(text) < 5:
+            return text
+            
+        prompt = f"""Translate the following text to {target_lang.upper()} language.
+
+CRITICAL: Translate accurately while preserving meaning and tone.
+
+Original text:
+{text}
+
+Instructions:
+1. Translate to {target_lang.upper()} language
+2. Preserve professional tone
+3. Keep the same meaning and structure
+4. Use appropriate terminology
+5. Natural, fluent translation
+
+Translated text:"""
+
+        system_prompt = (
+            "You are a professional translator. Translate accurately "
+            "while preserving meaning and tone."
+        )
+
+        if target_lang == "ru":
+            system_prompt = (
+                "Вы профессиональный переводчик. Переводите точно, "
+                "сохраняя смысл и тон. Пишите ПОЛНОСТЬЮ на русском языке."
+            )
+
+        try:
+            translated = self.llm.generate(
+                prompt,
+                system_prompt=system_prompt,
+                temperature=0.3,  # Lower temperature for accurate translation
+                max_tokens=len(text) * 3,  # Allow space for translation
+            )
+            if translated:
+                return translated.strip()
+            return text
+        except Exception as e:
+            print(f"Warning: Translation failed: {e}")
+            return text
+
+    def _translate_experience(
+        self, experiences: List[Experience], target_lang: str
+    ) -> List[Experience]:
+        """Translate experience entries to target language."""
+        translated_experiences = []
+        
+        for exp in experiences:
+            # Translate title
+            translated_title = self._translate_text(exp.title, target_lang) if exp.title else exp.title
+            
+            # Translate bullets
+            translated_bullets = []
+            for bullet in exp.bullets:
+                translated_bullet = self._translate_text(bullet, target_lang)
+                translated_bullets.append(translated_bullet)
+            
+            # Create translated experience entry
+            translated_exp = Experience(
+                title=translated_title,
+                company=exp.company,  # Keep company name as-is
+                dates=exp.dates,  # Keep dates as-is
+                location=exp.location,  # Keep location as-is
+                bullets=translated_bullets,
+                raw_text=exp.raw_text,
+            )
+            translated_experiences.append(translated_exp)
+        
+        return translated_experiences
+
+    def _translate_skills(self, skills: List[str], target_lang: str) -> List[str]:
+        """Translate skills to target language."""
+        if not skills:
+            return skills
+            
+        # Translate skills as a batch for efficiency
+        skills_text = ", ".join(skills)
+        
+        prompt = f"""Translate the following technical skills to {target_lang.upper()} language.
+
+CRITICAL: Translate technical terms appropriately for {target_lang.upper()}.
+
+Original skills:
+{skills_text}
+
+Instructions:
+1. Translate to {target_lang.upper()} language
+2. Keep technology names in original form when appropriate (e.g., Python, Docker, AWS)
+3. Translate descriptive terms (e.g., "Web Development" -> "Веб-разработка")
+4. Return as comma-separated list
+5. Preserve all skills
+
+Translated skills (comma-separated):"""
+
+        system_prompt = (
+            "You are a professional translator specializing in technical terminology. "
+            "Translate accurately while keeping technology names recognizable."
+        )
+
+        if target_lang == "ru":
+            system_prompt = (
+                "Вы профессиональный переводчик технической терминологии. "
+                "Переводите точно, сохраняя узнаваемость названий технологий."
+            )
+
+        try:
+            translated = self.llm.generate(
+                prompt,
+                system_prompt=system_prompt,
+                temperature=0.3,
+                max_tokens=len(skills_text) * 2,
+            )
+            if translated:
+                # Parse translated skills
+                translated_skills = [s.strip() for s in translated.split(",")]
+                return translated_skills if translated_skills else skills
+            return skills
+        except Exception as e:
+            print(f"Warning: Skills translation failed: {e}")
+            return skills
 
