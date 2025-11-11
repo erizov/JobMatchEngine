@@ -281,47 +281,41 @@ class SectionExtractor:
         entries = []
         current_entry = []
         
-        # Skip section header line
-        skip_first = False
-        if lines and any(pattern.match(lines[0].strip()) for pattern in [
-            re.compile(r"(?i)^(experience|work experience|employment|work history|опыт работы)")
-        ]):
+        # Skip section header line if present
+        if lines and re.match(r"(?i)^(experience|work experience|employment|work history|опыт работы)", lines[0].strip()):
             lines = lines[1:]
-            skip_first = True
 
         for i, line in enumerate(lines):
             line_stripped = line.strip()
+            
+            # Empty line marks end of entry
             if not line_stripped:
                 if current_entry:
                     entries.append("\n".join(current_entry))
                     current_entry = []
                 continue
 
-            # Check if this is the start of a new entry
-            # A new entry starts with a job title (non-bullet, non-date line)
-            # followed by company and dates
+            # Check if this is a bullet point
             is_bullet = line_stripped.startswith(('-', '•', '*')) or re.match(r'^\d+[.)]', line_stripped)
-            is_date_line = bool(re.search(r'\d{4}|\d{1,2}/\d{4}|(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}', line_stripped, re.IGNORECASE))
             
-            # If we have a current entry and this line is not a bullet or date
-            # and the next lines look like company/dates, this is a new entry
-            if current_entry and not is_bullet:
-                # Check if this could be a new job title
-                # (not a date line, and next line might be company or date)
-                next_line_is_company_or_date = False
-                if i + 1 < len(lines):
-                    next_line = lines[i + 1].strip()
-                    next_line_has_date = bool(re.search(r'\d{4}', next_line))
-                    next_line_is_bullet = next_line.startswith(('-', '•', '*'))
-                    next_line_is_company_or_date = next_line_has_date or (not next_line_is_bullet and len(next_line) < 50)
-                
-                # If current line doesn't have dates and looks like a title, and next line is company/dates
-                if not is_date_line and next_line_is_company_or_date and len(line_stripped) > 5:
-                    # This is a new entry
+            # Check if this line contains dates
+            has_dates = bool(re.search(r'\b(19|20)\d{2}\b', line_stripped))
+            
+            # If we have bullets in current entry, keep adding until empty line
+            if current_entry and any(l.strip().startswith(('-', '•', '*')) for l in current_entry):
+                current_entry.append(line)
+            # If line is a bullet, add to current entry
+            elif is_bullet:
+                current_entry.append(line)
+            # If current entry is empty or just has 1-2 lines (title/company/dates), add this line
+            elif len(current_entry) < 3:
+                current_entry.append(line)
+            # Otherwise, this might be a new entry - check if it looks like a title
+            elif not has_dates and not is_bullet and len(line_stripped) > 3:
+                # Save current entry and start new one
+                if current_entry:
                     entries.append("\n".join(current_entry))
-                    current_entry = [line]
-                else:
-                    current_entry.append(line)
+                current_entry = [line]
             else:
                 current_entry.append(line)
 
