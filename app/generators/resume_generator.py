@@ -231,10 +231,21 @@ class ResumeGenerator:
             resume.skills, job, max_keywords, rag_context
         )
 
-        system_prompt = (
-            "You are a professional resume writer. Optimize skills sections "
-            "by adding relevant keywords while preserving original skills."
-        )
+        # Language-specific system prompt for skills
+        target_language = resume.language or "en"
+        if target_language == "ru":
+            system_prompt = (
+                "Вы профессиональный писатель резюме. Оптимизируйте раздел навыков, "
+                "добавляя релевантные ключевые слова, сохраняя оригинальные навыки. "
+                "ВАЖНО: Пишите ПОЛНОСТЬЮ на русском языке, не смешивайте языки. "
+                "Используйте русские названия технологий и навыков."
+            )
+        else:
+            system_prompt = (
+                "You are a professional resume writer. Optimize skills sections "
+                "by adding relevant keywords while preserving original skills. "
+                "Write COMPLETELY in English language."
+            )
 
         try:
             # Check cache first
