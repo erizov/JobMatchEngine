@@ -259,21 +259,26 @@ class SectionExtractor:
         for i in range(start_idx + 1, len(lines)):
             line = lines[i].strip()
             if not line:
+                # Empty lines are OK within a section, don't break
                 continue
             # Check if this is another section header
+            is_header = False
             for other_section, other_patterns in self.SECTION_PATTERNS.items():
                 if other_section == section_name:
                     continue
                 for pattern in other_patterns:
                     if re.match(pattern, line):
                         end_idx = i
+                        is_header = True
                         break
-                if end_idx < len(lines):
+                if is_header:
                     break
-            if end_idx < len(lines):
+            if is_header:
                 break
 
-        return "\n".join(lines[start_idx:end_idx])
+        # Extract the section
+        section_lines = lines[start_idx:end_idx]
+        return "\n".join(section_lines)
 
     def _split_experience_entries(self, section_text: str) -> List[str]:
         """Split experience section into individual entries."""
