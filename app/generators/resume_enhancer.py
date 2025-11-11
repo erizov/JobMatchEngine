@@ -40,9 +40,15 @@ class ResumeEnhancer:
             Enhanced ParsedResume with all original sections preserved
         """
         # Enhance summary by adding keywords to existing text
-        enhanced_summary = self._enhance_summary(
-            resume.summary, resume, job, tone, rag_context
-        )
+        # If no summary exists, create one from experience and skills
+        if not resume.summary:
+            enhanced_summary = self._create_summary_from_experience(
+                resume, job, tone, rag_context
+            )
+        else:
+            enhanced_summary = self._enhance_summary(
+                resume.summary, resume, job, tone, rag_context
+            )
 
         # Enhance experience bullets by adding keywords
         enhanced_experience = self._enhance_experience(
