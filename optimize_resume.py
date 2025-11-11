@@ -267,8 +267,9 @@ async def optimize_resume_cli(
     print(f"Job: {job.title} at {job.company or 'Unknown'}")
     print(f"ATS Score: {match_before.ats_score:.1f} → {match_after.ats_score:.1f} ({improvement:+.1f})")
     print(f"\nOutput files saved to: {output_dir}")
-    num_files = len(languages_to_generate) * 6  # 6 formats per language
-    print(f"Generated {num_files} files (6 formats × {len(languages_to_generate)} language(s))")
+    formats_count = len(formats_to_generate)
+    num_files = len(languages_to_generate) * formats_count * 2  # 2 files (resume + cover) per format per language
+    print(f"Generated {num_files} files ({formats_count} format(s) × 2 files × {len(languages_to_generate)} language(s))")
     
     # Display token usage
     from app.utils.token_tracker import token_tracker
