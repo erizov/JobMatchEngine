@@ -57,14 +57,15 @@ class DocxBuilder:
                     section_keywords = ["experience", "summary", "skills", "education", "опыт работы", "резюме", "навыки", "образование"]
                     is_section_header = title_lower in [kw.lower() for kw in section_keywords] or title_lower == "опыт"
                     
-                    # Also skip if it's just a date or bullet marker
-                    is_date_or_marker = title_lower in ["- present", "present", "-", "•"] or title_lower.startswith("- ")
+                    # Only skip very short date markers, not longer descriptions that start with "- "
+                    short_markers = ["- present", "present", "-", "•"]
+                    is_date_or_marker = title_lower in short_markers or (title_lower.startswith("- ") and len(title_lower) < 15)
                     
                     if not is_section_header and not is_date_or_marker:
-                        # Include if it has bullets OR if it's a valid job title
-                        if exp.bullets or len(title_lower) > 3:  # Allow entries with no bullets if title looks valid
-                            self._add_experience_entry(doc, exp, language)
-                            valid_experience_count += 1
+                        # Include ALL entries that pass the basic checks - don't require bullets
+                        # This ensures we include all valid experience entries even if LLM didn't generate bullets
+                        self._add_experience_entry(doc, exp, language)
+                        valid_experience_count += 1
             
             # If no valid experience entries were added, add a note
             if valid_experience_count == 0 and resume.experience:
