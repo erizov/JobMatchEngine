@@ -445,6 +445,21 @@ class SectionExtractor:
         if not lines:
             return None
 
+        # Filter out section headers completely
+        filtered_lines = []
+        for line in lines:
+            # Skip section headers in both English and Russian
+            if re.match(
+                r"(?i)^(education|academic background|образование|квалификация)$",
+                line.strip(),
+            ):
+                continue
+            filtered_lines.append(line)
+        
+        if not filtered_lines:
+            return None
+        
+        lines = filtered_lines
         first_line = lines[0]
 
         # Extract dates

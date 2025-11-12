@@ -722,3 +722,32 @@ Translated skills (comma-separated):"""
             print(f"Warning: Skills translation failed: {e}")
             return skills
 
+    def _translate_education(self, educations: List, target_lang: str) -> List:
+        """Translate education entries to target language."""
+        from app.models import Education
+        
+        translated_educations = []
+        
+        for edu in educations:
+            # Translate degree
+            translated_degree = None
+            if edu.degree:
+                translated_degree = self._translate_text(edu.degree, target_lang)
+            
+            # Translate details if present
+            translated_details = None
+            if edu.details:
+                translated_details = self._translate_text(edu.details, target_lang)
+            
+            # Create translated education entry
+            translated_edu = Education(
+                degree=translated_degree,
+                institution=edu.institution,  # Keep institution name as-is
+                dates=edu.dates,  # Keep dates as-is
+                location=edu.location,  # Keep location as-is
+                details=translated_details,
+            )
+            translated_educations.append(translated_edu)
+        
+        return translated_educations
+
