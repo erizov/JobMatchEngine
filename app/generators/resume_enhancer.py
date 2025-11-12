@@ -76,6 +76,11 @@ class ResumeEnhancer:
         # Translate skills if needed
         if needs_translation:
             enhanced_skills = self._translate_skills(enhanced_skills, "ru")
+        
+        # Translate education if needed
+        enhanced_education = resume.education
+        if needs_translation:
+            enhanced_education = self._translate_education(resume.education, "ru")
 
         # Create enhanced resume - preserve ALL original sections
         enhanced_resume = ParsedResume(
@@ -83,7 +88,7 @@ class ResumeEnhancer:
             summary=enhanced_summary or resume.summary,
             experience=enhanced_experience or resume.experience,
             skills=enhanced_skills or resume.skills,
-            education=resume.education,  # Preserve as-is
+            education=enhanced_education,  # Translated if needed
             certifications=resume.certifications,  # Preserve as-is
             languages=resume.languages,  # Preserve as-is
             language=resume.language,  # Preserve language
